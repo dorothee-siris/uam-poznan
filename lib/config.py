@@ -49,6 +49,15 @@ TM_LABELS_DIMENSION = None
 # ── SDG ───────────────────────────────────────────────────────────────
 HAS_SDG = False
 
+# ── Column name overrides ────────────────────────────────────────────
+# SCHEMAS.md says pubs_pct_of_{code} but actual data uses pubs_pct_of_total.
+# This constant is the ACTUAL column name in the parquet files.
+PUBS_PCT_COL = "pubs_pct_of_total"
+
+# Domestic partner column is "top_domestic_partners" (not "top_pl_partners")
+# and uses the SAME 9-field blob format as international partners.
+DOMESTIC_PARTNER_COL_KEYWORD = "top_domestic_partners"
+
 # ── Domain Configuration (constant across all apps) ──────────────────
 DOMAIN_ORDER = [1, 2, 3, 4]
 DOMAIN_NAMES_ORDERED = [

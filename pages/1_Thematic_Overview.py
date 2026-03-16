@@ -54,15 +54,22 @@ st.header("Research Portfolio Treemap")
 df_tree = load_treemap_hierarchy()
 
 if df_tree is not None and not df_tree.empty:
-    # Colour metric selector
-    available_metrics = {"FWCI (median)": "fwci_median", "% International": "pct_international"}
-    if CAGR_COL.replace("cagr_", "cagr") and "cagr" in df_tree.columns:
+    # Colour metric selector — only offer metrics that exist in the data
+    available_metrics = {}
+    if "fwci_median" in df_tree.columns:
+        available_metrics["FWCI (median)"] = "fwci_median"
+    if "pct_international" in df_tree.columns:
+        available_metrics["% International"] = "pct_international"
+    if "cagr" in df_tree.columns:
         available_metrics["CAGR"] = "cagr"
 
-    col_tm1, col_tm2 = st.columns([3, 1])
-    with col_tm2:
-        color_choice = st.selectbox("Colour by", list(available_metrics.keys()), index=0)
-    color_metric = available_metrics[color_choice]
+    if available_metrics:
+        col_tm1, col_tm2 = st.columns([3, 1])
+        with col_tm2:
+            color_choice = st.selectbox("Colour by", list(available_metrics.keys()), index=0)
+        color_metric = available_metrics[color_choice]
+    else:
+        color_metric = "fwci_median"
 
     fig_tree = plot_treemap(df_tree, color_metric=color_metric)
     st.plotly_chart(fig_tree, use_container_width=True)
@@ -81,7 +88,6 @@ df_domains = get_overview_for_level("domain")
 
 if not df_domains.empty:
     # ── KPI row ───────────────────────────────────────────────────
-    pct_col = pubs_pct_col()
     total_pubs = df_domains["pubs_total"].sum()
     st.metric("Total indexed publications", format_int(total_pubs))
     st.write("")

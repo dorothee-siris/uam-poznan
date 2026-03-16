@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from typing import Any
 
 import numpy as np
@@ -15,7 +16,7 @@ from lib.config import (
     DOMAIN_EMOJI,
     DOMAIN_NAMES_ORDERED,
     DOMAIN_ORDER,
-    SHORT_CODE,
+    PUBS_PCT_COL,
 )
 
 
@@ -157,22 +158,14 @@ def parse_top_items(blob: str, fields: list[str]) -> list[dict]:
     return items
 
 
-def parse_sdg_breakdown(blob: str) -> dict[int, int]:
-    """Parse SDG breakdown blob → {sdg_id: count}."""
-    return {safe_int(k): safe_int(v) for k, v in parse_kv_blob(blob).items() if k}
-
-
 # =====================================================================
-#  Partner blob parsing (specific field lists)
+#  Partner blob parsing
 # =====================================================================
 
-INT_PARTNER_FIELDS = [
+# Both international AND domestic partners use the same 9-field format
+# in UAM data (SCHEMAS.md is wrong about domestic omitting country).
+PARTNER_FIELDS = [
     "id", "name", "country", "type", "copubs",
-    "share_inst", "share_int", "share_partner", "fwci",
-]
-
-DOMESTIC_PARTNER_FIELDS = [
-    "id", "name", "type", "copubs",
     "share_inst", "share_int", "share_partner", "fwci",
 ]
 
@@ -181,25 +174,72 @@ RECIPROCITY_PARTNER_FIELDS = [
     "share_inst", "share_int", "share_partner", "partner_total", "fwci",
 ]
 
-AUTHOR_FIELDS = [
-    "id", "name", "orcid", "pubs", "pct", "fwci", "is_inst", "labs",
-]
-
 
 def parse_int_partners(blob: str) -> list[dict]:
-    return parse_top_items(blob, INT_PARTNER_FIELDS)
+    return parse_top_items(blob, PARTNER_FIELDS)
 
 
 def parse_domestic_partners(blob: str) -> list[dict]:
-    return parse_top_items(blob, DOMESTIC_PARTNER_FIELDS)
+    """Domestic partners use the SAME format as international in UAM data."""
+    return parse_top_items(blob, PARTNER_FIELDS)
 
 
 def parse_reciprocity_partners(blob: str) -> list[dict]:
     return parse_top_items(blob, RECIPROCITY_PARTNER_FIELDS)
 
 
+# =====================================================================
+#  Author blob parsing — special handling for ORCID | conflicts
+# =====================================================================
+#
+# PROBLEM: Author blobs use | as record separator BUT ORCIDs within a
+# single author also use | to separate multiple ORCIDs.
+#   e.g. "A123:John:0000-0001-1234-5678|0000-0002-9876-5432:60:0.03:4.12|A456:..."
+#
+# SOLUTION: Split on a regex that matches "|" followed by an OpenAlex
+# author ID pattern (A + digits), which is the true record boundary.
+# Then within each record, recombine any remaining | as ORCID separators.
+#
+# Actual fields in UAM data: id, name, orcid(s), pubs, pct, fwci (6 fields)
+# SCHEMAS.md says 8 fields (adds is_inst, labs) but those don't exist here.
+
+_AUTHOR_RECORD_SPLIT = re.compile(r"\|(?=A\d)")
+
+
 def parse_authors(blob: str) -> list[dict]:
-    return parse_top_items(blob, AUTHOR_FIELDS)
+    """Parse author blob with ORCID-safe splitting."""
+    if _is_empty(blob):
+        return []
+
+    records = _AUTHOR_RECORD_SPLIT.split(str(blob))
+    items = []
+    for record in records:
+        record = record.strip()
+        if not record:
+            continue
+        parts = record.split(":")
+        if len(parts) < 6:
+            continue
+        # Fields: id (0), name (1), then everything up to the last 3 is orcid,
+        # then pubs (-3), pct (-2), fwci (-1)
+        author_id = parts[0].strip()
+        name = parts[1].strip()
+        pubs = parts[-3].strip()
+        pct = parts[-2].strip()
+        fwci = parts[-1].strip()
+        # Everything between name and pubs is the ORCID field(s)
+        orcid_parts = parts[2:-3]
+        orcid = ":".join(orcid_parts).strip()  # rejoin if ORCID itself contained colons
+
+        items.append({
+            "id": author_id,
+            "name": name,
+            "orcid": orcid,
+            "pubs": pubs,
+            "pct": pct,
+            "fwci": fwci,
+        })
+    return items
 
 
 # =====================================================================
@@ -233,8 +273,8 @@ def get_col(row, preferred: str, *fallbacks, default=None):
 
 
 def pubs_pct_col() -> str:
-    """Return the institution-specific pubs percentage column name."""
-    return f"pubs_pct_of_{SHORT_CODE}"
+    """Return the actual pubs percentage column name from config."""
+    return PUBS_PCT_COL
 
 
 # =====================================================================
@@ -514,7 +554,7 @@ def build_overview_table(
             "% Total": round(safe_float(r.get(pct_col)) * 100, 1),
             "FWCI median": round(safe_float(r.get("fwci_median")), 2),
             "% Int'l": round(safe_float(r.get("pct_international")) * 100, 1),
-            f"CAGR": format_cagr(r.get(CAGR_COL)),
+            "CAGR": format_cagr(r.get(CAGR_COL)),
         }
         rows.append(row)
     return pd.DataFrame(rows)

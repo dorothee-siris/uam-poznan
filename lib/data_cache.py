@@ -1,4 +1,12 @@
 # lib/data_cache.py — Cached loaders for UAM parquet files
+#
+# FILENAME MAPPING (actual files differ from SCHEMAS.md):
+#   thematic_overview.parquet       ← same
+#   thematic_sublevels.parquet      ← SCHEMAS says "thematic_detail_sublevels"
+#   thematic_partners.parquet       ← SCHEMAS says "thematic_detail_partners"
+#   thematic_authors.parquet        ← SCHEMAS says "thematic_detail_authors"
+#   thematic_treemap.parquet        ← SCHEMAS says "treemap_hierarchy"
+#   all_topics.parquet              ← same
 
 import os
 import streamlit as st
@@ -24,22 +32,22 @@ def load_thematic_overview() -> pd.DataFrame | None:
 
 @st.cache_data(show_spinner=False)
 def load_thematic_detail_sublevels() -> pd.DataFrame | None:
-    return _load("thematic_detail_sublevels.parquet")
+    return _load("thematic_sublevels.parquet")
 
 
 @st.cache_data(show_spinner=False)
 def load_thematic_detail_partners() -> pd.DataFrame | None:
-    return _load("thematic_detail_partners.parquet")
+    return _load("thematic_partners.parquet")
 
 
 @st.cache_data(show_spinner=False)
 def load_thematic_detail_authors() -> pd.DataFrame | None:
-    return _load("thematic_detail_authors.parquet")
+    return _load("thematic_authors.parquet")
 
 
 @st.cache_data(show_spinner=False)
 def load_treemap_hierarchy() -> pd.DataFrame | None:
-    return _load("treemap_hierarchy.parquet")
+    return _load("thematic_treemap.parquet")
 
 
 # ── Taxonomy (shared, constant) ──────────────────────────────────────
@@ -62,7 +70,7 @@ def get_overview_for_level(level: str) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def get_sublevels_for_parent(parent_level: str, parent_id: str) -> pd.DataFrame:
-    """Return child rows from thematic_detail_sublevels for a given parent."""
+    """Return child rows from thematic_sublevels for a given parent."""
     df = load_thematic_detail_sublevels()
     if df is None:
         return pd.DataFrame()

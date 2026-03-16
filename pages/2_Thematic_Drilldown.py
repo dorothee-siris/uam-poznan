@@ -27,6 +27,8 @@ from lib.config import (
     HAS_DOMINANCE,
     HAS_PP_TOP,
     OA_TOPIC_LEVEL_NAME,
+    PUBS_PCT_COL,
+    DOMESTIC_PARTNER_COL_KEYWORD,
     YEARS,
 )
 from lib.data_cache import (
@@ -73,7 +75,7 @@ LEVEL_OPTIONS = {
     "Domain": "domain",
     "Field": "field",
     "Subfield": "subfield",
-    f"Topic (OA)": OA_TOPIC_LEVEL_NAME,
+    "Topic (OA)": OA_TOPIC_LEVEL_NAME,
 }
 level_label = st.sidebar.selectbox("Classification level", list(LEVEL_OPTIONS.keys()))
 level = LEVEL_OPTIONS[level_label]
@@ -131,36 +133,45 @@ c3.metric(f"CAGR {CAGR_LABEL}", format_cagr(row.get(CAGR_COL)))
 c4.metric("FWCI (median)", format_fwci(row.get("fwci_median")))
 
 # ── Row 2: Citation & Collaboration ──────────────────────────────────
-c5, c6, c7, c8 = st.columns(4)
-c5.metric("FWCI (mean)", format_fwci(row.get("fwci_mean")))
+row2_metrics = []
+fwci_mean = row.get("fwci_mean")
+if fwci_mean is not None and not (isinstance(fwci_mean, float) and pd.isna(fwci_mean)):
+    row2_metrics.append(("FWCI (mean)", format_fwci(fwci_mean)))
 
-pct_top10 = row.get("pct_top10")
-if pct_top10 is not None and not (isinstance(pct_top10, float) and pd.isna(pct_top10)):
-    c6.metric("% Top 10%", format_pct(pct_top10))
+pct_int = row.get("pct_international")
+if pct_int is not None and not (isinstance(pct_int, float) and pd.isna(pct_int)):
+    row2_metrics.append(("% International", format_pct(pct_int)))
 
-pct_top1 = row.get("pct_top1")
-if pct_top1 is not None and not (isinstance(pct_top1, float) and pd.isna(pct_top1)):
-    c7.metric("% Top 1%", format_pct(pct_top1))
-
-c8.metric("% International", format_pct(row.get("pct_international")))
-
-# ── Row 3: Optional metrics ──────────────────────────────────────────
-optional_cols = []
 pct_company = row.get("pct_company")
 if pct_company is not None and not (isinstance(pct_company, float) and pd.isna(pct_company)):
-    optional_cols.append(("% Company", format_pct(pct_company)))
+    row2_metrics.append(("% Company", format_pct(pct_company)))
 
+# pct_top10 and pct_top1 — only show if they exist in the data
+for col_name, label in [("pct_top10", "% Top 10%"), ("pct_top1", "% Top 1%")]:
+    val = row.get(col_name)
+    if val is not None and not (isinstance(val, float) and pd.isna(val)):
+        row2_metrics.append((label, format_pct(val)))
+
+if row2_metrics:
+    cols = st.columns(len(row2_metrics))
+    for col, (lbl, val) in zip(cols, row2_metrics):
+        col.metric(lbl, val)
+
+# ── Row 3: Optional advanced metrics ─────────────────────────────────
+optional_cols = []
 if INITIATIVE_COL and row.get(INITIATIVE_COL) is not None:
-    optional_cols.append((f"% {INITIATIVE_LABEL}", format_pct(row.get(INITIATIVE_COL))))
+    init_val = row.get(INITIATIVE_COL)
+    if not (isinstance(init_val, float) and pd.isna(init_val)):
+        optional_cols.append((f"% {INITIATIVE_LABEL}", format_pct(init_val)))
 
-if HAS_SI and SI_NATIONAL_COL and row.get(SI_NATIONAL_COL) is not None:
+if HAS_SI and SI_NATIONAL_COL:
     si_val = row.get(SI_NATIONAL_COL)
-    if not (isinstance(si_val, float) and pd.isna(si_val)):
+    if si_val is not None and not (isinstance(si_val, float) and pd.isna(si_val)):
         optional_cols.append((SI_NATIONAL_LABEL, f"{safe_float(si_val):.2f}"))
 
-if HAS_NCI and row.get("nci") is not None:
+if HAS_NCI:
     nci_val = row.get("nci")
-    if not (isinstance(nci_val, float) and pd.isna(nci_val)):
+    if nci_val is not None and not (isinstance(nci_val, float) and pd.isna(nci_val)):
         optional_cols.append(("NCI", f"{safe_float(nci_val):.2f}"))
 
 if optional_cols:
@@ -246,11 +257,7 @@ if element_level in CHILD_LEVELS:
         df_bar["pct_label"] = df_bar["pubs_pct_of_parent"].apply(
             lambda x: f"{safe_float(x) * 100:.1f}%"
         )
-        # Assign domain colors
-        if "domain_id" in df_bar.columns:
-            df_bar["color"] = df_bar["domain_id"].apply(lambda d: domain_color(d))
-        else:
-            df_bar["color"] = domain_color(dom_display)
+        df_bar["color"] = domain_color(dom_display)
 
         fig_bar = plot_horizontal_bar(
             df_bar,
@@ -326,20 +333,22 @@ partner_row = get_partners_for_element(element_level, element_id)
 if partner_row is not None:
 
     # ── Find the right blob columns ──────────────────────────────
-    # International partners
+    # Use exact column names from the actual data, with fallback search
     int_blob_col = None
     dom_blob_col = None
     recip_blob_col = None
+
     for col in partner_row.index:
-        col_lower = col.lower()
-        if "top_int_partners" in col_lower or "top int partners" in col_lower.replace("_", " "):
+        col_lower = col.lower().replace(" ", "_")
+        if col == "top_int_partners" or "top_int_partner" in col_lower:
             int_blob_col = col
-        if f"top_{DOMESTIC_CODE}_partners" in col_lower or f"top {DOMESTIC_CODE} partners" in col_lower.replace("_", " "):
+        # Domestic: look for the configured keyword (default: "top_domestic_partners")
+        if col == DOMESTIC_PARTNER_COL_KEYWORD or "top_domestic" in col_lower:
             dom_blob_col = col
-        if "reciprocity" in col_lower:
+        if col == "reciprocity_partners" or "reciprocity" in col_lower:
             recip_blob_col = col
 
-    # ── International partners ────────────────────────────────────
+    # ── Tabs ──────────────────────────────────────────────────────
     tab_int, tab_dom, tab_recip = st.tabs([
         "Top International Partners",
         f"Top {DOMESTIC_LABEL} Partners",
@@ -353,10 +362,10 @@ if partner_row is not None:
                 df_int = pd.DataFrame(partners_int)
                 df_int["copubs"] = df_int["copubs"].apply(safe_int)
                 df_int["fwci"] = df_int["fwci"].apply(safe_float)
-                df_int["share_inst"] = df_int["share_inst"].apply(
+                df_int["share_inst_fmt"] = df_int["share_inst"].apply(
                     lambda x: f"{safe_float(x) * 100:.1f}%"
                 )
-                df_int["share_partner"] = df_int["share_partner"].apply(
+                df_int["share_partner_fmt"] = df_int["share_partner"].apply(
                     lambda x: f"{safe_float(x) * 100:.1f}%"
                 )
                 df_int["fwci_fmt"] = df_int["fwci"].apply(lambda x: f"{x:.2f}")
@@ -365,8 +374,8 @@ if partner_row is not None:
                     "country": "Country",
                     "type": "Type",
                     "copubs": "Co-pubs",
-                    "share_inst": f"% of {SHORT_NAME}",
-                    "share_partner": "% of Partner",
+                    "share_inst_fmt": f"% of {SHORT_NAME}",
+                    "share_partner_fmt": "% of Partner",
                     "fwci_fmt": "Avg FWCI",
                 }
                 df_show = df_int.rename(columns=display_cols)[list(display_cols.values())]
@@ -379,12 +388,13 @@ if partner_row is not None:
     # ── Domestic partners ─────────────────────────────────────────
     with tab_dom:
         if dom_blob_col:
+            # Domestic uses SAME format as international (includes country)
             partners_dom = parse_domestic_partners(partner_row.get(dom_blob_col, ""))
             if partners_dom:
                 df_dom = pd.DataFrame(partners_dom)
                 df_dom["copubs"] = df_dom["copubs"].apply(safe_int)
                 df_dom["fwci"] = df_dom["fwci"].apply(safe_float)
-                df_dom["share_inst"] = df_dom["share_inst"].apply(
+                df_dom["share_inst_fmt"] = df_dom["share_inst"].apply(
                     lambda x: f"{safe_float(x) * 100:.1f}%"
                 )
                 df_dom["fwci_fmt"] = df_dom["fwci"].apply(lambda x: f"{x:.2f}")
@@ -392,7 +402,7 @@ if partner_row is not None:
                     "name": "Partner",
                     "type": "Type",
                     "copubs": "Co-pubs",
-                    "share_inst": f"% of {SHORT_NAME}",
+                    "share_inst_fmt": f"% of {SHORT_NAME}",
                     "fwci_fmt": "Avg FWCI",
                 }
                 df_show_d = df_dom.rename(columns=display_cols_d)[list(display_cols_d.values())]
@@ -416,7 +426,7 @@ if partner_row is not None:
 
                 # Geo category
                 def geo_cat(country: str) -> str:
-                    return DOMESTIC_COUNTRY if country.strip() == DOMESTIC_COUNTRY else "International"
+                    return DOMESTIC_COUNTRY if str(country).strip() == DOMESTIC_COUNTRY else "International"
 
                 df_recip["geo"] = df_recip["country"].apply(geo_cat)
 
@@ -477,7 +487,7 @@ if author_row is not None:
     # Find the author blob column
     author_blob_col = None
     for col in author_row.index:
-        if "top_authors" in col.lower() or "top authors" in col.lower().replace("_", " "):
+        if col == "top_authors" or "top_authors" in col.lower().replace(" ", "_"):
             author_blob_col = col
             break
 
@@ -485,23 +495,19 @@ if author_row is not None:
         authors = parse_authors(author_row.get(author_blob_col, ""))
         if authors:
             df_auth = pd.DataFrame(authors)
-            df_auth["pubs"] = df_auth["pubs"].apply(safe_int)
-            df_auth["fwci"] = df_auth["fwci"].apply(safe_float)
-            df_auth["pct"] = df_auth["pct"].apply(
+            df_auth["pubs_int"] = df_auth["pubs"].apply(safe_int)
+            df_auth["fwci_float"] = df_auth["fwci"].apply(safe_float)
+            df_auth["pct_fmt"] = df_auth["pct"].apply(
                 lambda x: f"{safe_float(x) * 100:.1f}%"
             )
-            df_auth["fwci_fmt"] = df_auth["fwci"].apply(lambda x: f"{x:.2f}")
+            df_auth["fwci_fmt"] = df_auth["fwci_float"].apply(lambda x: f"{x:.2f}")
 
             display_cols_a = {
                 "name": "Author",
-                "pubs": "Publications",
-                "pct": f"% of {element_name}",
+                "pubs_int": "Publications",
+                "pct_fmt": f"% of {element_name}",
                 "fwci_fmt": "Avg FWCI",
-                "labs": "Lab(s)",
             }
-            # Only include labs column if data present
-            if df_auth["labs"].str.strip().eq("").all():
-                del display_cols_a["labs"]
 
             df_show_a = df_auth.rename(columns=display_cols_a)[list(display_cols_a.values())]
             st.dataframe(df_show_a, use_container_width=True, hide_index=True)
