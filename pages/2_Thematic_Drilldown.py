@@ -218,7 +218,7 @@ with col_right:
         ))
         fig_ts.update_layout(
             template="plotly_white",
-            height=350,
+            height=400,
             xaxis=dict(dtick=1, title="Year"),
             yaxis_title="Publications",
             margin=dict(t=30, l=50, r=30, b=50),
