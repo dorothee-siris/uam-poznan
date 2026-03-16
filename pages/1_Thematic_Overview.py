@@ -308,7 +308,7 @@ if not df_topics.empty:
 
     df_tp_show = df_tp_show.nlargest(tp_top_n, "pubs_total")
     tbl_tp = build_overview_table(df_tp_show, OA_TOPIC_LEVEL_NAME, show_emoji=True)
-    tbl_tp = tbl_tp.sort_values("pubs_total", ascending=False)
+    tbl_tp = tbl_tp.sort_values("Pubs", ascending=False)
 
     st.dataframe(
         tbl_tp,
