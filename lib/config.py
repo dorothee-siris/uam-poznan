@@ -42,7 +42,7 @@ HAS_POLES = False
 # ── Topic Modeling ────────────────────────────────────────────────────
 # No custom topic model for UAM — set to None to skip TM sections
 TM_LEVEL_NAME = None
-OA_TOPIC_LEVEL_NAME = "topic"
+OA_TOPIC_LEVEL_NAME = "oa_topic"
 TM_METHOD_DESCRIPTION = None
 TM_LABELS_DIMENSION = None
 
