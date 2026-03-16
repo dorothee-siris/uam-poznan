@@ -301,7 +301,7 @@ if element_level in CHILD_LEVELS:
             df_tbl_c,
             use_container_width=True,
             hide_index=True,
-            height=min(600, len(df_tbl_c) * 38 + 50),
+            height=min(500, len(df_tbl_c) * 38 + 50),
             column_config={
                 "% of Parent": st.column_config.ProgressColumn(
                     "% of Parent", min_value=0, max_value=100, format="%.1f%%",
