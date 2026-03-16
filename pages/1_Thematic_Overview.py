@@ -308,21 +308,7 @@ if not df_topics.empty:
 
     df_tp_show = df_tp_show.nlargest(tp_top_n, "pubs_total")
     tbl_tp = build_overview_table(df_tp_show, OA_TOPIC_LEVEL_NAME, show_emoji=True)
-    if not tbl_tp.empty:
-        tbl_tp = tbl_tp.sort_values("Pubs", ascending=False)
-        st.dataframe(
-            tbl_tp,
-            use_container_width=True,
-            hide_index=True,
-            height=600,
-            column_config={
-                "% Total": st.column_config.ProgressColumn(
-                    "% Total", min_value=0, max_value=100, format="%.1f%%",
-                ),
-            },
-        )
-    else:
-        st.info("No topics match the current filters.")
+    tbl_tp = tbl_tp.sort_values("Pubs", ascending=False)
 
     st.dataframe(
         tbl_tp,
