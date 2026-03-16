@@ -182,55 +182,50 @@ if optional_cols:
 st.divider()
 
 # =====================================================================
-#  2. FWCI Distribution
+#  2. FWCI Distribution + Publication Trend (side by side)
 # =====================================================================
 
-st.header("FWCI Distribution")
+col_left, col_right = st.columns([1, 2])
 
-bp_raw = row.get("fwci_boxplot", "")
-bp = parse_fwci_boxplot(bp_raw)
-if bp:
-    show_ext = st.toggle("Include extreme values (p0, p100)", value=False, key="dd_ext")
-    bp["category"] = element_name
-    bp["color"] = domain_color(dom_display)
-    bp["count"] = safe_int(row.get("pubs_total"))
-    fig_bp = plot_precomputed_boxplot([bp], show_extremes=show_ext, height=350)
-    fig_bp.update_layout(yaxis_title="FWCI")
-    st.plotly_chart(fig_bp, use_container_width=True)
-else:
-    st.info("No FWCI distribution data available for this element.")
+with col_left:
+    st.header("FWCI Distribution")
+    bp_raw = row.get("fwci_boxplot", "")
+    bp = parse_fwci_boxplot(bp_raw)
+    if bp:
+        show_ext = st.toggle("Include extreme values (p0, p100)", value=False, key="dd_ext")
+        bp["category"] = element_name
+        bp["color"] = domain_color(dom_display)
+        bp["count"] = safe_int(row.get("pubs_total"))
+        fig_bp = plot_precomputed_boxplot([bp], show_extremes=show_ext, height=350)
+        fig_bp.update_layout(yaxis_title="FWCI")
+        st.plotly_chart(fig_bp, use_container_width=True)
+    else:
+        st.info("No FWCI distribution data available.")
 
-st.divider()
-
-# =====================================================================
-#  3. Publication Time Series
-# =====================================================================
-
-st.header("Publication Trend")
-
-year_blob = row.get("pubs_per_year", "")
-year_counts = parse_year_counts(year_blob)
-
-if year_counts:
-    df_years = pd.DataFrame(
-        [{"Year": y, "Publications": c} for y, c in sorted(year_counts.items())]
-    )
-    fig_ts = go.Figure(go.Bar(
-        x=df_years["Year"], y=df_years["Publications"],
-        marker_color=domain_color(dom_display),
-        text=df_years["Publications"],
-        textposition="outside",
-    ))
-    fig_ts.update_layout(
-        template="plotly_white",
-        height=350,
-        xaxis=dict(dtick=1, title="Year"),
-        yaxis_title="Publications",
-        margin=dict(t=30, l=50, r=30, b=50),
-    )
-    st.plotly_chart(fig_ts, use_container_width=True)
-else:
-    st.info("No yearly publication data available.")
+with col_right:
+    st.header("Publication Trend")
+    year_blob = row.get("pubs_per_year", "")
+    year_counts = parse_year_counts(year_blob)
+    if year_counts:
+        df_years = pd.DataFrame(
+            [{"Year": y, "Publications": c} for y, c in sorted(year_counts.items())]
+        )
+        fig_ts = go.Figure(go.Bar(
+            x=df_years["Year"], y=df_years["Publications"],
+            marker_color=domain_color(dom_display),
+            text=df_years["Publications"],
+            textposition="outside",
+        ))
+        fig_ts.update_layout(
+            template="plotly_white",
+            height=350,
+            xaxis=dict(dtick=1, title="Year"),
+            yaxis_title="Publications",
+            margin=dict(t=30, l=50, r=30, b=50),
+        )
+        st.plotly_chart(fig_ts, use_container_width=True)
+    else:
+        st.info("No yearly publication data available.")
 
 st.divider()
 
