@@ -19,6 +19,15 @@ st.set_page_config(page_title="Topic Explorer", layout="wide")
 def load_topic_model():
     df = pd.read_parquet("data/pubs_test.parquet")
 
+    # Ensure correct dtypes (parquet sometimes stores as object)
+    df["pub_year"] = pd.to_numeric(df["pub_year"], errors="coerce").astype("Int64")
+    df["fwci"] = pd.to_numeric(df["fwci"], errors="coerce")
+    df["tm_cluster"] = pd.to_numeric(df["tm_cluster"], errors="coerce").astype("Int64")
+    df["tm_x"] = pd.to_numeric(df["tm_x"], errors="coerce")
+    df["tm_y"] = pd.to_numeric(df["tm_y"], errors="coerce")
+    for bc in ["is_oa", "is_international", "is_company"]:
+        df[bc] = df[bc].astype(bool)
+
     # Parse taxonomy labels
     for col in ["p_topic", "p_subfield", "p_field", "p_domain"]:
         label_col = f"{col}_label"
